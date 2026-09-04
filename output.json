@@ -1,0 +1,30 @@
+{
+  "updatedAt": "2026-09-04 05:11 기준",
+  "markets": [
+    {
+      "key": "us",
+      "name": "S&P500",
+      "sub": "미국 시장 전체",
+      "value": 100
+    }
+  ],
+  "krSectors": [],
+  "usSectors": [
+    {
+      "name": "빅테크",
+      "value": 100
+    },
+    {
+      "name": "에너지",
+      "value": 100
+    },
+    {
+      "name": "헬스케어",
+      "value": 100
+    },
+    {
+      "name": "금융",
+      "value": 100
+    }
+  ]
+}
