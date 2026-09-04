@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>마켓 무드 — 공포탐욕지수</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&family=Nunito+Sans:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #EEF1F6;
+    --ink: #2B3555;
+    --ink-soft: #767E96;
+    --card: #FFFFFF;
+    --line: #E1E5EF;
+    --fear-2: #C25143;
+    --fear-1: #DC8A4E;
+    --neutral: #DFB94E;
+    --greed-1: #7CAE5F;
+    --greed-2: #4B8F63;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Nunito Sans', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 48px;
+  }
+
+  header { padding: 28px 20px 8px; }
+  .eyebrow { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+
+  h1 {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 26px;
+    letter-spacing: -0.01em;
+    margin-top: 4px;
+  }
+
+  .updated { font-size: 12px; color: var(--ink-soft); margin-top: 6px; }
+
+  .placeholder-tag {
+    display: inline-block;
+    margin: 20px 20px 0;
+    font-size: 11px;
+    color: var(--fear-1);
+    background: #FBEEE3;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+
+  .gauge-card {
+    margin: 18px 20px 0;
+    background: var(--card);
+    border-radius: 22px;
+    padding: 22px 20px 18px;
+    border: 1px solid var(--line);
+  }
+
+  .gauge-top { display: flex; align-items: baseline; justify-content: space-between; }
+  .gauge-market-name { font-family: 'Nunito', sans-serif; font-weight: 700; font-size: 16px; }
+  .gauge-market-sub { font-size: 12px; color: var(--ink-soft); }
+
+  .gauge-wrap { position: relative; width: 100%; max-width: 300px; margin: 6px auto 0; }
+  .zone-label { font-size: 9.5px; font-weight: 700; fill: var(--ink-soft); }
+  .gauge-label { text-align: center; margin-top: 2px; }
+
+  .gauge-number {
+    font-family: 'Nunito', sans-serif;
+    font-weight: 800;
+    font-size: 42px;
+    line-height: 1;
+  }
+
+  .gauge-word { font-size: 15px; font-weight: 700; margin-top: 4px; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    padding: 0 24px;
+    margin-top: 26px;
+    margin-bottom: 10px;
+  }
+
+  .sector-list { padding: 0 20px; display: flex; flex-direction: column; gap: 8px; }
+
+  .sector-item {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .sector-name { flex: 1; font-size: 14px; font-weight: 600; }
+
+  .sector-bar-track {
+    width: 88px; height: 7px; border-radius: 4px;
+    background: var(--line); position: relative; overflow: hidden;
+  }
+
+  .sector-bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+
+  .sector-value {
+    width: 30px; text-align: right; font-size: 13px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Zone guide (beginner explanation) ---- */
+  .zone-guide { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+
+  .zone-guide-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; padding: 14px 16px;
+  }
+
+  .zone-dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+  .zone-guide-name { font-weight: 700; font-size: 14px; margin-bottom: 3px; }
+  .zone-guide-desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.55; }
+
+  .zone-guide-note {
+    font-size: 11.5px; color: var(--ink-soft); padding: 4px 24px 0;
+    line-height: 1.6; font-style: italic;
+  }
+
+  /* ---- CTA ---- */
+  .cta { margin: 28px 20px 0; background: var(--ink); color: #fff; border-radius: 20px; padding: 20px; }
+  .cta-title { font-family: 'Nunito', sans-serif; font-size: 18px; font-weight: 800; }
+  .cta-desc { font-size: 13px; color: #CBD0E2; margin-top: 6px; line-height: 1.55; }
+
+  .cta-btn {
+    display: block; text-align: center; margin-top: 14px;
+    background: #fff; color: var(--ink); font-weight: 700; font-size: 14px;
+    padding: 12px; border-radius: 12px; text-decoration: none;
+  }
+
+  .disclaimer { margin: 20px 24px 0; font-size: 11px; color: var(--ink-soft); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">오늘의 시장 심리</div>
+  <h1>마켓 무드</h1>
+  <div class="updated" id="updatedText">기준 —</div>
+</header>
+
+<span class="placeholder-tag">샘플 데이터 · 실제 지수 연동 전</span>
+
+<div id="gaugeArea"></div>
+
+<div class="section-title">국내 업종별</div>
+<div class="sector-list" id="krSectorList"></div>
+
+<div class="section-title">미국 업종별</div>
+<div class="sector-list" id="usSectorList"></div>
+
+<div class="section-title">지수는 이렇게 읽으면 돼요</div>
+<div class="zone-guide" id="zoneGuide"></div>
+<div class="zone-guide-note">※ 지수는 시장 분위기를 보여주는 참고 지표예요. 매수·매도 판단의 유일한 기준으로 쓰기엔 충분하지 않아요.</div>
+
+<div class="cta">
+  <div class="cta-title">매일 아침 알림 받기</div>
+  <div class="cta-desc">코스피·미국 지수를 텔레그램으로 매일 무료로 보내드려요. 업종별 알림과 원하는 시간 설정은 유료 플랜에서 이용하실 수 있어요.</div>
+  <a class="cta-btn" href="#" id="telegramLink">텔레그램으로 무료 받기</a>
+</div>
+
+<div class="disclaimer">
+  본 서비스는 시장 데이터를 참고용으로 가공해 제공하는 정보 서비스이며, 특정 종목의 매수·매도를 권유하지 않습니다. 투자 판단과 그 책임은 이용자 본인에게 있습니다.
+</div>
+
+<script>
+  // ------------------------------------------------------------------
+  // 샘플 데이터입니다. 실제 서비스에서는 이 부분을
+  // pykrx / yfinance로 계산한 값을 API에서 받아와 채우면 됩니다.
+  // ------------------------------------------------------------------
+  const sampleData = {
+    updatedAt: "2026-09-04 08:00 기준",
+    markets: [
+      { key: "kospi", name: "코스피", sub: "국내 시장 전체", value: 34 },
+      { key: "us", name: "S&P500", sub: "미국 시장 전체", value: 58 },
+    ],
+    krSectors: [
+      { name: "반도체", value: 44 },
+      { name: "2차전지", value: 22 },
+      { name: "바이오", value: 51 },
+      { name: "금융", value: 60 },
+    ],
+    usSectors: [
+      { name: "빅테크", value: 62 },
+      { name: "에너지", value: 39 },
+      { name: "헬스케어", value: 48 },
+      { name: "금융", value: 57 },
+    ],
+  };
+
+  // CNN 공포탐욕지수와 동일한 구간: 0=극단적 공포(빨강) → 100=극단적 탐욕(초록)
+  const zones = [
+    { label: "극단적 공포", from: 0,  to: 20,  color: "#C25143",
+      desc: "투자자 대부분이 크게 불안해하는 상태예요. 매도가 몰리면서 주가가 실제 가치보다 많이 낮게 형성돼 있을 가능성이 있어요." },
+    { label: "공포",       from: 20, to: 40,  color: "#DC8A4E",
+      desc: "시장 분위기가 전반적으로 위축돼 있는 상태예요. 좋은 소식보다 나쁜 소식에 더 민감하게 반응하는 시기예요." },
+    { label: "중립",       from: 40, to: 60,  color: "#DFB94E",
+      desc: "낙관과 불안이 팽팽하게 맞선, 어느 한쪽으로 쏠리지 않은 상태예요." },
+    { label: "탐욕",       from: 60, to: 80,  color: "#7CAE5F",
+      desc: "투자자들이 낙관적이고 매수세가 강한 상태예요. 앞으로 더 오를 거라는 기대가 커지는 시기예요." },
+    { label: "극단적 탐욕", from: 80, to: 100, color: "#4B8F63",
+      desc: "시장이 뜨겁게 달아오른 상태예요. 가격이 실제 가치보다 부풀려져 있을 가능성에 유의할 시기예요." },
+  ];
+
+  function zoneFor(v) {
+    return zones.find(z => v >= z.from && v <= z.to) || zones[zones.length - 1];
+  }
+
+  // 좌표 변환: angleDeg 180°=왼쪽(값 0), 90°=위(값 50), 0°=오른쪽(값 100)
+  function polarToXY(cx, cy, r, angleDeg) {
+    const rad = (angleDeg * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy - r * Math.sin(rad) };
+  }
+
+  // 각 구간을 짧은 선분들의 연속(polyline)으로 그려서 방향 왜곡 없이 정확히 표현
+  function zoneArcPoints(cx, cy, r, fromVal, toVal) {
+    const startDeg = 180 - (fromVal / 100) * 180;
+    const endDeg = 180 - (toVal / 100) * 180;
+    const steps = 24;
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const deg = startDeg + (endDeg - startDeg) * t;
+      const p = polarToXY(cx, cy, r, deg);
+      pts.push(`${p.x.toFixed(2)},${p.y.toFixed(2)}`);
+    }
+    return pts.join(" ");
+  }
+
+  function buildGaugeSVG(id) {
+    const cx = 150, cy = 150, r = 118;
+
+    let segs = "";
+    zones.forEach(z => {
+      segs += `<polyline points="${zoneArcPoints(cx, cy, r, z.from, z.to)}" fill="none" stroke="${z.color}" stroke-width="16" stroke-linecap="butt"/>`;
+    });
+
+    let labels = "";
+    zones.forEach(z => {
+      const mid = (z.from + z.to) / 2;
+      const deg = 180 - (mid / 100) * 180;
+      const pos = polarToXY(cx, cy, r + 22, deg);
+      let anchor = "middle";
+      if (pos.x < cx - 15) anchor = "start";
+      if (pos.x > cx + 15) anchor = "end";
+      labels += `<text x="${pos.x}" y="${pos.y}" text-anchor="${anchor}" class="zone-label">${z.label}</text>`;
+    });
+
+    // 바늘: 기본은 정확히 위(값 50)를 가리키고, 0이면 왼쪽, 100이면 오른쪽으로 회전
+    return `
+      <svg viewBox="0 0 300 175" width="100%" id="${id}">
+        ${segs}
+        ${labels}
+        <line id="${id}-needle" x1="${cx}" y1="${cy}" x2="${cx}" y2="${cy - 90}" stroke="#2B3555" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="${cx}" cy="${cy}" r="6.5" fill="#2B3555"/>
+      </svg>`;
+  }
+
+  function render(data) {
+    document.getElementById("updatedText").textContent = data.updatedAt;
+
+    const gaugeArea = document.getElementById("gaugeArea");
+    gaugeArea.innerHTML = data.markets.map(m => {
+      const gid = `gauge-${m.key}`;
+      return `
+        <div class="gauge-card">
+          <div class="gauge-top">
+            <div class="gauge-market-name">${m.name}</div>
+            <div class="gauge-market-sub">${m.sub}</div>
+          </div>
+          <div class="gauge-wrap">${buildGaugeSVG(gid)}</div>
+          <div class="gauge-label">
+            <div class="gauge-number" id="${gid}-number"></div>
+            <div class="gauge-word" id="${gid}-word"></div>
+          </div>
+        </div>`;
+    }).join("");
+
+    data.markets.forEach(m => {
+      const gid = `gauge-${m.key}`;
+      const z = zoneFor(m.value);
+      document.getElementById(`${gid}-number`).textContent = m.value;
+      document.getElementById(`${gid}-number`).style.color = z.color;
+      document.getElementById(`${gid}-word`).textContent = z.label;
+      document.getElementById(`${gid}-word`).style.color = z.color;
+      // 0 -> -90deg(왼쪽), 50 -> 0deg(정면), 100 -> +90deg(오른쪽)
+      const angle = (m.value / 100) * 180 - 90;
+      document.getElementById(`${gid}-needle`).setAttribute("transform", `rotate(${angle} 150 150)`);
+    });
+
+    function renderSectorList(elId, items) {
+      document.getElementById(elId).innerHTML = items.map(s => {
+        const z = zoneFor(s.value);
+        return `
+          <div class="sector-item">
+            <div class="sector-name">${s.name}</div>
+            <div class="sector-bar-track">
+              <div class="sector-bar-fill" style="width:${s.value}%; background:${z.color}"></div>
+            </div>
+            <div class="sector-value" style="color:${z.color}">${s.value}</div>
+          </div>`;
+      }).join("");
+    }
+
+    renderSectorList("krSectorList", data.krSectors);
+    renderSectorList("usSectorList", data.usSectors);
+
+    document.getElementById("zoneGuide").innerHTML = zones.map(z => `
+      <div class="zone-guide-item">
+        <span class="zone-dot" style="background:${z.color}"></span>
+        <div>
+          <div class="zone-guide-name">${z.label} (${z.from}~${z.to})</div>
+          <div class="zone-guide-desc">${z.desc}</div>
+        </div>
+      </div>`).join("");
+  }
+
+  render(sampleData);
+</script>
+
+</body>
+</html>
