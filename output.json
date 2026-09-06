@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-09-05 00:26 기준",
+  "updatedAt": "2026-09-06 00:28 기준",
   "markets": [
     {
       "key": "us",
@@ -9,5 +9,22 @@
     }
   ],
   "krSectors": [],
-  "usSectors": []
+  "usSectors": [
+    {
+      "name": "빅테크",
+      "value": 72
+    },
+    {
+      "name": "에너지",
+      "value": 90
+    },
+    {
+      "name": "헬스케어",
+      "value": 75
+    },
+    {
+      "name": "금융",
+      "value": 75
+    }
+  ]
 }
