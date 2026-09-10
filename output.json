@@ -1,11 +1,11 @@
 {
-  "updatedAt": "2026-09-09 00:27 기준",
+  "updatedAt": "2026-09-10 00:22 기준",
   "markets": [
     {
       "key": "us",
       "name": "S&P500",
       "sub": "미국 시장 전체",
-      "value": 68
+      "value": 65
     }
   ],
   "krSectors": [],
