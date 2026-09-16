@@ -32,7 +32,13 @@ jobs:
           file_pattern: output.json
 
   screen_stocks:
-    if: github.event_name != 'schedule' || github.event.schedule == '30 0 * * *'
+    needs: update
+    # update이 실제로 스케줄상 건너뛰어진 경우(result == 'skipped')에도 계속 진행.
+    # needs로 순서를 강제하는 이유는 오직 workflow_dispatch로 두 job이 같은 실행 안에서
+    # 동시에 돌 때 서로의 git 커밋/푸시가 충돌(non-fast-forward)하는 걸 막기 위함이고,
+    # 실제 cron 스케줄에서는 두 job이 항상 별도의 워크플로우 실행으로 나뉘어 돌기 때문에
+    # 이 의존관계가 실행 여부에 영향을 주지 않음.
+    if: always() && (needs.update.result == 'success' || needs.update.result == 'skipped') && (github.event_name != 'schedule' || github.event.schedule == '30 0 * * *')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
