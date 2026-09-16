@@ -2,7 +2,8 @@ name: Daily Market Mood Update
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *'   # 공포탐욕지수 계산 + 발송
+    - cron: '30 0 * * *'  # 급락+보합 스크리너 실행 + 발송 (전종목 순회로 시간이 오래 걸려 별도 스케줄로 분리)
   workflow_dispatch:
 
 permissions:
@@ -10,6 +11,7 @@ permissions:
 
 jobs:
   update:
+    if: github.event_name != 'schedule' || github.event.schedule == '0 0 * * *'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,3 +30,28 @@ jobs:
         with:
           commit_message: "chore: update output.json"
           file_pattern: output.json
+
+  screen_stocks:
+    if: github.event_name != 'schedule' || github.event.schedule == '30 0 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Run drop + flat screener
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+        run: python screener_prototype.py
+      - name: Send Telegram alert
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python send_screener_telegram.py
+      - name: Commit updated data
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update screener_output.json"
+          file_pattern: screener_output.json

@@ -16,6 +16,7 @@
   (이 채팅 환경은 인터넷 접속이 막혀 있어 여기서는 실행 결과를 확인할 수 없음)
 """
 
+import json
 import time
 import datetime
 from pykrx import stock
@@ -66,9 +67,9 @@ def check_recent_flat(df, lookback_days: int, change_threshold: float, range_thr
 
     change_pct = (end_close - start_close) / start_close
     range_pct = (recent["종가"].max() - recent["종가"].min()) / start_close
-    is_flat = abs(change_pct) <= change_threshold and range_pct <= range_threshold
+    is_flat = bool(abs(change_pct) <= change_threshold and range_pct <= range_threshold)
 
-    return is_flat, round(change_pct * 100, 1), round(range_pct * 100, 1)
+    return is_flat, float(round(change_pct * 100, 1)), float(round(range_pct * 100, 1))
 
 
 def check_drop_from_high(code: str, start: str, end: str, threshold: float):
@@ -101,7 +102,7 @@ def check_drop_from_high(code: str, start: str, end: str, threshold: float):
             "code": code,
             "recent_high": int(recent_high),
             "current_close": int(current_close),
-            "drop_ratio": round(drop_ratio * 100, 1),
+            "drop_ratio": float(round(drop_ratio * 100, 1)),
             "is_recent_flat": is_flat,
             "recent_change_pct": recent_change_pct,
             "recent_range_pct": recent_range_pct,
@@ -141,6 +142,20 @@ def run_screener():
     return results, flat_results
 
 
+def save_results_json(results, flat_results, path="screener_output.json"):
+    """텔레그램 발송 스크립트(send_screener_telegram.py)가 읽을 결과 파일 생성"""
+    data = {
+        "updatedAt": datetime.datetime.now().strftime("%Y-%m-%d %H:%M 기준"),
+        "totalCount": len(results),
+        "flatCount": len(flat_results),
+        "results": results,
+        "flatResults": flat_results,
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    print(f"\n{path} 생성 완료")
+
+
 if __name__ == "__main__":
     results, flat_results = run_screener()
 
@@ -151,3 +166,5 @@ if __name__ == "__main__":
     print("\n--- 그중 최근 1주일가량 보합인 종목 ---")
     for r in flat_results:
         print(r)
+
+    save_results_json(results, flat_results)
