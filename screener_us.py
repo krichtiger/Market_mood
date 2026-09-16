@@ -19,6 +19,7 @@
   (이 채팅 환경은 인터넷 접속이 막혀 있어 여기서는 실행 결과를 확인할 수 없음)
 """
 
+import io
 import json
 import time
 import datetime
@@ -65,12 +66,37 @@ def get_date_range(lookback_days: int):
     return start.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d")
 
 
-def _find_table_with_column(tables, column_candidates):
-    """읽어온 여러 표 중 원하는 컬럼이 있는 첫 표를 반환"""
-    for table in tables:
-        for col in column_candidates:
-            if col in table.columns:
-                return table, col
+def _match_column(columns, candidates):
+    """
+    표의 컬럼 목록에서 candidates 중 하나와 (대소문자 무시 + 부분 일치) 매칭되는
+    실제 컬럼 키를 반환. MultiIndex 컬럼(여러 헤더 행)도 각 레벨을 이어붙여 비교.
+    매칭 없으면 None.
+    """
+    for col in columns:
+        col_text = "|".join(str(x) for x in col) if isinstance(col, tuple) else str(col)
+        for cand in candidates:
+            if cand.lower() in col_text.lower():
+                return col
+    return None
+
+
+def _find_table_with_column(tables, column_candidates, min_rows=20):
+    """
+    읽어온 여러 표 중 원하는 컬럼이 있는 표를 반환. 지수 구성종목 표는 보통
+    수십~수백 행이므로, 같은 컬럼명을 가진 작은(관련 없을 가능성이 큰) 표보다
+    min_rows 이상인 표를 우선한다.
+    """
+    for require_min_rows in (True, False):
+        for table in tables:
+            if require_min_rows and len(table) < min_rows:
+                continue
+            matched = _match_column(table.columns, column_candidates)
+            if matched is not None:
+                return table, matched
+
+    print(f"[DEBUG] 컬럼 {column_candidates}을 가진 표를 찾지 못함. 발견된 표들의 컬럼 목록:")
+    for i, table in enumerate(tables):
+        print(f"  table[{i}] rows={len(table)} columns: {list(table.columns)}")
     raise ValueError(f"컬럼 {column_candidates}을 가진 표를 찾지 못함")
 
 
@@ -80,9 +106,9 @@ def get_universe_tickers():
     for url, symbol_cols, name_cols, market in UNIVERSE_SOURCES:
         resp = requests.get(url, headers=WIKI_HEADERS, timeout=15)
         resp.raise_for_status()
-        tables = pd.read_html(resp.text)
+        tables = pd.read_html(io.StringIO(resp.text))
         table, symbol_col = _find_table_with_column(tables, symbol_cols)
-        name_col = next((c for c in name_cols if c in table.columns), None)
+        name_col = _match_column(table.columns, name_cols)
 
         for _, row in table.iterrows():
             symbol = str(row[symbol_col]).strip().replace(".", "-")
