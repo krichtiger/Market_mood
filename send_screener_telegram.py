@@ -1,6 +1,10 @@
 """
 screener_output.json 내용을 읽어서 텔레그램으로 발송하는 스크립트.
 GitHub Actions에서 TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID 환경변수를 넣어 실행합니다.
+
+TODO: 현재 daily.yml에서는 호출하지 않음 (중간 결과 발송 대신 아티팩트로만 남김).
+파이프라인 3~5단계(재무제표 분석 -> 뉴스 분석 -> 종합 리포트)가 구현되면,
+이 스크립트를 종합 리포트 발송 스크립트로 교체하거나 그 안에서 재사용할 것.
 """
 
 import json
