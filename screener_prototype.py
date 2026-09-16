@@ -6,6 +6,8 @@
 - KRX_ID, KRX_PW 환경변수 설정 필요 (2025.12.27부터 로그인 필수)
 - KOSPI + KOSDAQ 전종목을 대상으로 최근 20영업일(약 1개월) 중 최고가 대비
   현재 종가가 -30% 이상 하락한 종목을 찾는다.
+- 그중에서 최근 5영업일(약 1주일)간 종가 변화율/변동폭이 작아 보합 상태인
+  종목을 추가로 골라낸다.
 
 주의:
 - 전종목(2천개 이상) 순회라 API 호출이 많음 -> 실행 시간이 김 (수 분 이상)
@@ -23,6 +25,10 @@ LOOKBACK_DAYS = 20          # 최근 1개월(영업일 기준)로 볼 기간
 DROP_THRESHOLD = 0.30       # 고점 대비 하락률 기준 (30%)
 REQUEST_DELAY_SEC = 0.3     # 종목간 호출 딜레이 (서버 부하/레이트리밋 방지)
 MARKETS = ["KOSPI", "KOSDAQ"]
+
+FLAT_LOOKBACK_DAYS = 5      # 보합 여부를 판단할 최근 기간 (약 1주일, 영업일 기준)
+FLAT_CHANGE_THRESHOLD = 0.03   # 기간 시작~종료 종가 변화율이 이 이내면 보합
+FLAT_RANGE_THRESHOLD = 0.05    # 기간 내 종가 최고/최저 변동폭이 이 이내면 보합
 
 
 def get_date_range(lookback_days: int):
@@ -42,6 +48,27 @@ def get_all_tickers():
             name = stock.get_market_ticker_name(code)
             tickers.append({"code": code, "name": name, "market": market})
     return tickers
+
+
+def check_recent_flat(df, lookback_days: int, change_threshold: float, range_threshold: float):
+    """
+    df의 마지막 lookback_days개 종가를 기준으로 최근 보합 여부를 판단.
+    (시작~종료 종가 변화율, 기간 내 최고/최저 변동폭이 모두 기준 이내면 보합)
+    """
+    recent = df.tail(lookback_days)
+    if len(recent) < 2:
+        return False, None, None
+
+    start_close = recent["종가"].iloc[0]
+    end_close = recent["종가"].iloc[-1]
+    if start_close <= 0:
+        return False, None, None
+
+    change_pct = (end_close - start_close) / start_close
+    range_pct = (recent["종가"].max() - recent["종가"].min()) / start_close
+    is_flat = abs(change_pct) <= change_threshold and range_pct <= range_threshold
+
+    return is_flat, round(change_pct * 100, 1), round(range_pct * 100, 1)
 
 
 def check_drop_from_high(code: str, start: str, end: str, threshold: float):
@@ -67,11 +94,17 @@ def check_drop_from_high(code: str, start: str, end: str, threshold: float):
     drop_ratio = (recent_high - current_close) / recent_high
 
     if drop_ratio >= threshold:
+        is_flat, recent_change_pct, recent_range_pct = check_recent_flat(
+            df, FLAT_LOOKBACK_DAYS, FLAT_CHANGE_THRESHOLD, FLAT_RANGE_THRESHOLD
+        )
         return {
             "code": code,
             "recent_high": int(recent_high),
             "current_close": int(current_close),
             "drop_ratio": round(drop_ratio * 100, 1),
+            "is_recent_flat": is_flat,
+            "recent_change_pct": recent_change_pct,
+            "recent_range_pct": recent_range_pct,
         }
     return None
 
@@ -101,10 +134,20 @@ def run_screener():
     results.sort(key=lambda x: x["drop_ratio"], reverse=True)
 
     print(f"\n총 {len(results)}개 종목이 고점 대비 -{int(DROP_THRESHOLD*100)}% 이상 하락")
-    return results
+
+    flat_results = [r for r in results if r["is_recent_flat"]]
+    print(f"그중 최근 {FLAT_LOOKBACK_DAYS}영업일간 보합인 종목: {len(flat_results)}개")
+
+    return results, flat_results
 
 
 if __name__ == "__main__":
-    results = run_screener()
+    results, flat_results = run_screener()
+
+    print("\n--- 고점 대비 -30% 이상 하락 종목 전체 ---")
     for r in results:
+        print(r)
+
+    print("\n--- 그중 최근 1주일가량 보합인 종목 ---")
+    for r in flat_results:
         print(r)
