@@ -42,6 +42,10 @@ FLAT_CHANGE_THRESHOLD = 0.03   # 기간 시작~종료 종가 변화율이 이 �
 FLAT_RANGE_THRESHOLD = 0.05    # 기간 내 종가 최고/최저 변동폭이 이 이내면 보합
 
 # 유니버스 소스: (위키피디아 URL, 심볼 컬럼 후보들, 종목명 컬럼 후보들, market 태그)
+# TODO: 나스닥100 위키피디아 문서에 Ticker/Symbol 컬럼을 가진 구성종목 표가 더 이상
+# 없는 것으로 확인됨(문서 구조 변경 추정) -> get_universe_tickers()가 이 소스 실패를
+# 건너뛰고 S&P500만으로 계속 진행하도록 방어했지만, 나스닥100은 더 안정적인 소스
+# (예: 다른 위키 문서, 유지관리되는 CSV, Nasdaq 자체 API 등)로 교체가 필요함.
 UNIVERSE_SOURCES = [
     (
         "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
@@ -101,14 +105,24 @@ def _find_table_with_column(tables, column_candidates, min_rows=20):
 
 
 def get_universe_tickers():
-    """S&P500 + 나스닥100 종목 코드와 이름을 위키피디아에서 가져온다 (중복 종목은 market을 합쳐서 표시)"""
+    """
+    S&P500 + 나스닥100 종목 코드와 이름을 위키피디아에서 가져온다
+    (중복 종목은 market을 합쳐서 표시).
+
+    소스 중 하나(예: 위키피디아 문서 구조 변경으로 표를 못 찾는 경우)가 실패해도
+    전체 스크리너가 죽지 않도록, 소스별로 개별 처리하고 실패한 소스는 건너뛴다.
+    """
     merged = {}
     for url, symbol_cols, name_cols, market in UNIVERSE_SOURCES:
-        resp = requests.get(url, headers=WIKI_HEADERS, timeout=15)
-        resp.raise_for_status()
-        tables = pd.read_html(io.StringIO(resp.text))
-        table, symbol_col = _find_table_with_column(tables, symbol_cols)
-        name_col = _match_column(table.columns, name_cols)
+        try:
+            resp = requests.get(url, headers=WIKI_HEADERS, timeout=15)
+            resp.raise_for_status()
+            tables = pd.read_html(io.StringIO(resp.text))
+            table, symbol_col = _find_table_with_column(tables, symbol_cols)
+            name_col = _match_column(table.columns, name_cols)
+        except Exception as e:
+            print(f"[WARN] {market} 유니버스 소스({url}) 조회 실패, 이 소스는 건너뜀: {e}")
+            continue
 
         for _, row in table.iterrows():
             symbol = str(row[symbol_col]).strip().replace(".", "-")
@@ -116,6 +130,9 @@ def get_universe_tickers():
             if symbol not in merged:
                 merged[symbol] = {"code": symbol, "name": name, "markets": set()}
             merged[symbol]["markets"].add(market)
+
+    if not merged:
+        raise RuntimeError("모든 유니버스 소스 조회에 실패해서 대상 종목이 없음")
 
     tickers = [
         {"code": t["code"], "name": t["name"], "market": "+".join(sorted(t["markets"]))}
