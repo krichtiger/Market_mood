@@ -24,7 +24,12 @@ import time
 import datetime
 
 import pandas as pd
+import requests
 import yfinance as yf
+
+# 위키피디아는 브라우저 User-Agent가 없는 요청(기본 urllib/pandas)을 403으로 차단하므로
+# requests로 직접 받아온 뒤 pd.read_html에 HTML 문자열을 넘긴다.
+WIKI_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; MarketMoodScreener/1.0)"}
 
 # ----- 설정값 -----
 LOOKBACK_DAYS = 20          # 최근 1개월(영업일 기준)로 볼 기간
@@ -73,7 +78,9 @@ def get_universe_tickers():
     """S&P500 + 나스닥100 종목 코드와 이름을 위키피디아에서 가져온다 (중복 종목은 market을 합쳐서 표시)"""
     merged = {}
     for url, symbol_cols, name_cols, market in UNIVERSE_SOURCES:
-        tables = pd.read_html(url)
+        resp = requests.get(url, headers=WIKI_HEADERS, timeout=15)
+        resp.raise_for_status()
+        tables = pd.read_html(resp.text)
         table, symbol_col = _find_table_with_column(tables, symbol_cols)
         name_col = next((c for c in name_cols if c in table.columns), None)
 
