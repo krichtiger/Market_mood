@@ -4,14 +4,14 @@
 전제:
 - pykrx 설치 필요: pip install pykrx
 - KRX_ID, KRX_PW 환경변수 설정 필요 (2025.12.27부터 로그인 필수)
-- KOSPI + KOSDAQ 전종목을 대상으로 최근 20영업일(약 1개월) 중 최고가 대비
-  현재 종가가 -30% 이상 하락한 종목을 찾는다.
-- 그중에서 최근 5영업일(약 1주일)간 종가 변화율/변동폭이 작아 보합 상태인
-  종목을 추가로 골라낸다.
+- KOSPI 시가총액 상위 200위 + KOSDAQ 시가총액 상위 200위 종목을 대상으로,
+  최근 20영업일(약 1개월) 중 최고가 대비 현재 종가가 -30% 이상 하락한 종목을 찾는다.
+- 그중에서 최근 5영업일(약 1주일)간 변동성(최고-최저 변동폭)이 5% 이내로
+  작은 보합 상태인 종목을 추가로 골라낸다.
 
 주의:
-- 전종목(2천개 이상) 순회라 API 호출이 많음 -> 실행 시간이 김 (수 분 이상)
-- Yahoo/KRX 서버 부하를 줄이기 위해 종목 사이에 짧은 딜레이를 둠
+- 시가총액 상위 종목만 순회하므로 예전(전종목) 버전보다 훨씬 빠르게 끝남
+- KRX 서버 부하를 줄이기 위해 종목 사이에 짧은 딜레이를 둠
 - 이 스크립트는 로컬 또는 Claude Code(클라우드)에서 실행해야 함
   (이 채팅 환경은 인터넷 접속이 막혀 있어 여기서는 실행 결과를 확인할 수 없음)
 """
@@ -26,10 +26,10 @@ LOOKBACK_DAYS = 20          # 최근 1개월(영업일 기준)로 볼 기간
 DROP_THRESHOLD = 0.30       # 고점 대비 하락률 기준 (30%)
 REQUEST_DELAY_SEC = 0.3     # 종목간 호출 딜레이 (서버 부하/레이트리밋 방지)
 MARKETS = ["KOSPI", "KOSDAQ"]
+TOP_N_PER_MARKET = 200      # 시장별 시가총액 상위 몇 위까지 대상으로 할지
 
-FLAT_LOOKBACK_DAYS = 5      # 보합 여부를 판단할 최근 기간 (약 1주일, 영업일 기준)
-FLAT_CHANGE_THRESHOLD = 0.03   # 기간 시작~종료 종가 변화율이 이 이내면 보합
-FLAT_RANGE_THRESHOLD = 0.05    # 기간 내 종가 최고/최저 변동폭이 이 이내면 보합
+FLAT_LOOKBACK_DAYS = 5          # 보합 여부를 판단할 최근 기간 (약 1주일, 영업일 기준)
+FLAT_VOLATILITY_THRESHOLD = 0.05   # 기간 내 종가 최고/최저 변동폭이 이 이내면 보합
 
 
 def get_date_range(lookback_days: int):
@@ -40,36 +40,44 @@ def get_date_range(lookback_days: int):
     return start.strftime("%Y%m%d"), today.strftime("%Y%m%d")
 
 
-def get_all_tickers():
-    """KOSPI + KOSDAQ 전종목 코드와 이름을 가져온다"""
+def get_top_market_cap_tickers(market: str, top_n: int):
+    """market(KOSPI/KOSDAQ)의 시가총액 상위 top_n개 종목 코드/이름을 가져온다"""
+    today = datetime.date.today().strftime("%Y%m%d")
+    cap_df = stock.get_market_cap_by_ticker(today, market=market, alternative=True)
+    top = cap_df.sort_values("시가총액", ascending=False).head(top_n)
+
     tickers = []
-    for market in MARKETS:
-        codes = stock.get_market_ticker_list(market=market)
-        for code in codes:
-            name = stock.get_market_ticker_name(code)
-            tickers.append({"code": code, "name": name, "market": market})
+    for code in top.index:
+        name = stock.get_market_ticker_name(code)
+        tickers.append({"code": code, "name": name, "market": market})
     return tickers
 
 
-def check_recent_flat(df, lookback_days: int, change_threshold: float, range_threshold: float):
+def get_all_tickers():
+    """KOSPI + KOSDAQ 시가총액 상위 종목(시장별 TOP_N_PER_MARKET개)의 코드와 이름을 가져온다"""
+    tickers = []
+    for market in MARKETS:
+        tickers.extend(get_top_market_cap_tickers(market, TOP_N_PER_MARKET))
+    return tickers
+
+
+def check_recent_flat(df, lookback_days: int, volatility_threshold: float):
     """
     df의 마지막 lookback_days개 종가를 기준으로 최근 보합 여부를 판단.
-    (시작~종료 종가 변화율, 기간 내 최고/최저 변동폭이 모두 기준 이내면 보합)
+    (기간 내 최고/최저 종가 변동폭이 기준 이내면 보합)
     """
     recent = df.tail(lookback_days)
     if len(recent) < 2:
-        return False, None, None
+        return False, None
 
-    start_close = recent["종가"].iloc[0]
-    end_close = recent["종가"].iloc[-1]
-    if start_close <= 0:
-        return False, None, None
+    ref_close = recent["종가"].iloc[0]
+    if ref_close <= 0:
+        return False, None
 
-    change_pct = (end_close - start_close) / start_close
-    range_pct = (recent["종가"].max() - recent["종가"].min()) / start_close
-    is_flat = bool(abs(change_pct) <= change_threshold and range_pct <= range_threshold)
+    volatility_pct = (recent["종가"].max() - recent["종가"].min()) / ref_close
+    is_flat = bool(volatility_pct <= volatility_threshold)
 
-    return is_flat, float(round(change_pct * 100, 1)), float(round(range_pct * 100, 1))
+    return is_flat, float(round(volatility_pct * 100, 1))
 
 
 def check_drop_from_high(code: str, start: str, end: str, threshold: float):
@@ -95,8 +103,8 @@ def check_drop_from_high(code: str, start: str, end: str, threshold: float):
     drop_ratio = (recent_high - current_close) / recent_high
 
     if drop_ratio >= threshold:
-        is_flat, recent_change_pct, recent_range_pct = check_recent_flat(
-            df, FLAT_LOOKBACK_DAYS, FLAT_CHANGE_THRESHOLD, FLAT_RANGE_THRESHOLD
+        is_flat, recent_volatility_pct = check_recent_flat(
+            df, FLAT_LOOKBACK_DAYS, FLAT_VOLATILITY_THRESHOLD
         )
         return {
             "code": code,
@@ -104,8 +112,7 @@ def check_drop_from_high(code: str, start: str, end: str, threshold: float):
             "current_close": int(current_close),
             "drop_ratio": float(round(drop_ratio * 100, 1)),
             "is_recent_flat": is_flat,
-            "recent_change_pct": recent_change_pct,
-            "recent_range_pct": recent_range_pct,
+            "recent_volatility_pct": recent_volatility_pct,
         }
     return None
 
@@ -115,7 +122,7 @@ def run_screener():
     print(f"조회 기간: {start} ~ {end}")
 
     tickers = get_all_tickers()
-    print(f"전체 대상 종목 수: {len(tickers)}")
+    print(f"전체 대상 종목 수: {len(tickers)} (시장별 시가총액 상위 {TOP_N_PER_MARKET}개)")
 
     results = []
     for i, t in enumerate(tickers):
@@ -137,13 +144,13 @@ def run_screener():
     print(f"\n총 {len(results)}개 종목이 고점 대비 -{int(DROP_THRESHOLD*100)}% 이상 하락")
 
     flat_results = [r for r in results if r["is_recent_flat"]]
-    print(f"그중 최근 {FLAT_LOOKBACK_DAYS}영업일간 보합인 종목: {len(flat_results)}개")
+    print(f"그중 최근 {FLAT_LOOKBACK_DAYS}영업일간 변동성 {int(FLAT_VOLATILITY_THRESHOLD*100)}% 이내(보합)인 종목: {len(flat_results)}개")
 
     return results, flat_results
 
 
 def save_results_json(results, flat_results, path="screener_output.json"):
-    """텔레그램 발송 스크립트(send_screener_telegram.py)가 읽을 결과 파일 생성"""
+    """다음 단계(재무분석 등)가 읽을 결과 파일 생성"""
     data = {
         "updatedAt": datetime.datetime.now().strftime("%Y-%m-%d %H:%M 기준"),
         "totalCount": len(results),
