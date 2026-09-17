@@ -3,8 +3,6 @@ name: Daily Market Mood Update
 on:
   schedule:
     - cron: '0 0 * * *'   # 공포탐욕지수 계산 + 발송
-    - cron: '30 0 * * *'  # 국내 급락+보합 스크리너 (전종목 순회로 시간이 오래 걸려 별도 스케줄로 분리)
-    - cron: '30 1 * * *'  # 미국 급락+보합 스크리너 (S&P500+나스닥100 순회, 국내와 겹치지 않게 1시간 뒤로 배치)
   workflow_dispatch:
 
 permissions:
@@ -12,7 +10,6 @@ permissions:
 
 jobs:
   update:
-    if: github.event_name != 'schedule' || github.event.schedule == '0 0 * * *'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,61 +28,3 @@ jobs:
         with:
           commit_message: "chore: update output.json"
           file_pattern: output.json
-
-  # 이 job은 아직 파이프라인의 1~2단계(스크리닝 + 1주 횡보 필터)까지만 수행한다.
-  # 3단계(재무제표 분석), 4단계(뉴스 분석), 5단계(종합 리포트)가 구현되기 전까지는
-  # 텔레그램으로 중간 결과를 보내지 않고, 결과를 Actions 아티팩트로만 남겨서
-  # 로그/디버깅 용도로 확인한다.
-  # TODO: 5단계(종합 리포트) 구현 후 이 job의 출력을 리포트 생성 단계에 연결하고,
-  #       텔레그램 발송은 최종 리포트 1건만 보내도록 send_screener_telegram.py를
-  #       종합 리포트 발송 스크립트로 교체/연동할 것.
-  screen_stocks:
-    if: github.event_name != 'schedule' || github.event.schedule == '30 0 * * *'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - name: Run drop + flat screener
-        env:
-          KRX_ID: ${{ secrets.KRX_ID }}
-          KRX_PW: ${{ secrets.KRX_PW }}
-        run: python screener_prototype.py
-      # TODO: 텔레그램 발송은 아직 연결하지 않음 (종합 리포트 완성 전까지 보류).
-      # 파이프라인 5단계(종합 리포트)까지 구현되면, 여기서 만든 screener_output.json을
-      # 재무제표/뉴스 분석 결과와 합쳐 최종 리포트를 만들고, 그 리포트 1건만
-      # send_screener_telegram.py(또는 후속 리포트 발송 스크립트)로 발송할 것.
-      # - name: Send Telegram alert
-      #   env:
-      #     TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      #     TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      #   run: python send_screener_telegram.py
-      - name: Upload screener results as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: screener-output
-          path: screener_output.json
-          retention-days: 14
-
-  # 미국판. 로직/구조는 screen_stocks(국내)와 동일하며, 마찬가지로 아직 텔레그램
-  # 발송은 하지 않고 아티팩트로만 남긴다 (TODO는 screen_stocks 위 주석 참고).
-  screen_stocks_us:
-    if: github.event_name != 'schedule' || github.event.schedule == '30 1 * * *'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - name: Run US drop + flat screener
-        run: python screener_us.py
-      # TODO: screen_stocks와 동일하게, 5단계(종합 리포트) 구현 후 연동할 것.
-      - name: Upload screener results as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: screener-us-output
-          path: screener_us_output.json
-          retention-days: 14
