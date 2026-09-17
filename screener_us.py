@@ -140,7 +140,7 @@ def get_universe_tickers():
     ranked = []
     for t in tickers:
         try:
-            market_cap = yf.Ticker(t["code"]).fast_info.get("market_cap")
+            market_cap = yf.Ticker(t["code"]).info.get("marketCap")
         except Exception as e:
             print(f"[SKIP] {t['code']} 시가총액 조회 실패: {e}")
             market_cap = None

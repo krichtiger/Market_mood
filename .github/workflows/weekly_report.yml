@@ -1,0 +1,60 @@
+name: Weekly Value Screener Report
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # 매주 월요일 00:00 UTC
+  workflow_dispatch:
+
+jobs:
+  weekly_report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+
+      - name: 1-2단계 국내 스크리닝 + 보합 필터
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+        run: python screener_prototype.py
+
+      - name: 1-2단계 해외 스크리닝 + 보합 필터
+        run: python screener_us.py
+
+      - name: 4단계 국내 재무분석 (DART)
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+        run: python financial_analysis_kr.py
+
+      - name: 4단계 해외 재무분석 (yfinance)
+        run: python financial_analysis_us.py
+
+      - name: 5단계 뉴스 분석 (Claude API)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python news_analysis.py
+
+      - name: 6단계 종합 리포트 작성 + 텔레그램 발송
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python report_generator.py
+
+      - name: 단계별 중간 결과 아티팩트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-pipeline-output
+          path: |
+            screener_output.json
+            screener_us_output.json
+            financial_analysis_kr_output.json
+            financial_analysis_us_output.json
+            news_analysis_output.json
+            final_report.txt
+          retention-days: 30
+          if-no-files-found: warn
