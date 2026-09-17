@@ -21,6 +21,41 @@ TELEGRAM_MESSAGE_LIMIT = 4096
 client = anthropic.Anthropic() if os.environ.get("ANTHROPIC_API_KEY") else None
 
 
+def _format_krw(amount):
+    """DART 재무제표 금액(원 단위)을 '억원' 단위 문자열로 변환"""
+    return f"{amount / 1e8:,.0f}억원"
+
+
+def build_financial_line(c):
+    """종목의 최근 매출/영업이익 및 전년대비(YoY) 실적을 한 줄로 요약.
+    국내(DART)는 실제 금액+YoY, 해외(yfinance)는 성장률만 제공되므로 있는 값만 표시."""
+    parts = []
+
+    revenue = c.get("revenue")
+    revenue_growth = c.get("revenue_growth_pct")
+    if revenue is not None:
+        text = f"매출 {_format_krw(revenue)}"
+        if revenue_growth is not None:
+            text += f"(YoY {revenue_growth:+.1f}%)"
+        parts.append(text)
+    elif revenue_growth is not None:
+        parts.append(f"매출 YoY {revenue_growth:+.1f}%")
+
+    operating_income = c.get("operating_income")
+    operating_income_growth = c.get("operating_income_growth_pct")
+    if operating_income is not None:
+        text = f"영업이익 {_format_krw(operating_income)}"
+        if operating_income_growth is not None:
+            text += f"(YoY {operating_income_growth:+.1f}%)"
+        parts.append(text)
+    elif operating_income_growth is not None:
+        parts.append(f"영업이익 YoY {operating_income_growth:+.1f}%")
+    elif c.get("earnings_growth_pct") is not None:
+        parts.append(f"이익성장률 YoY {c['earnings_growth_pct']:+.1f}%")
+
+    return " / ".join(parts) if parts else "실적 데이터 없음"
+
+
 def build_fallback_report(candidates):
     """ANTHROPIC_API_KEY가 없을 때, LLM 없이 원본 데이터만으로 간단한 리포트 생성"""
     lines = [
@@ -31,6 +66,7 @@ def build_fallback_report(candidates):
     for i, c in enumerate(candidates[:TOP_N], 1):
         lines.append(
             f"{i}. {c['name']}({c['code']}, {c['market']}) 고점대비 -{c['drop_ratio']}%\n"
+            f"   최근 실적: {build_financial_line(c)}\n"
             f"   재무: {c.get('reason', '')}\n"
             f"   하락요인: {c.get('decline_reason', '')}"
         )
@@ -47,6 +83,7 @@ def build_report(candidates):
         f"- {c['name']}({c['code']}, {c['market']})\n"
         f"  고점대비 하락률: -{c['drop_ratio']}%\n"
         f"  최근1주 변동성: {c.get('recent_volatility_pct')}%\n"
+        f"  최근 실적(매출/영업이익, 전년대비): {build_financial_line(c)}\n"
         f"  재무: {c.get('reason', '')}\n"
         f"  하락요인: {c.get('decline_reason', '')} ({c.get('reason_type', '')})\n"
         f"  판단근거: {c.get('verdict_reason', '')}"
@@ -63,7 +100,9 @@ def build_report(candidates):
 
 형식:
 - 맨 위에 "이번 주 저평가 후보 종목" 제목과 총 후보 수
-- 종목별로: 순위, 종목명(코드), 시장, 고점대비 하락률, 선정 이유(2~3문장, 재무+뉴스 근거 요약)
+- 종목별로: 순위, 종목명(코드), 시장, 고점대비 하락률, 최근 매출/영업이익 및 전년대비(YoY) 실적,
+  선정 이유(2~3문장, 재무+뉴스 근거 요약)
+- 실적 수치는 주어진 데이터 그대로 표기하고 지어내지 말 것 (데이터 없으면 "실적 데이터 없음"으로 표기)
 - 너무 길지 않게, 텔레그램 메시지로 보내기 적당한 분량(전체 3500자 이내)으로 작성
 - 이모지를 적절히 사용해서 가독성 있게
 
