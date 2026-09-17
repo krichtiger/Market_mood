@@ -73,7 +73,10 @@ def run_financial_analysis(candidates):
     """
     passed = []
     for c in candidates:
-        result = {**c, **analyze_financial_value(c["code"])}
+        result = analyze_financial_value(c["code"])
+        # 원본 스크리너 결과(drop_ratio, recent_volatility_pct 등)를 보존한 뒤 재무분석
+        # 필드로 덮어써서, 후속 단계(뉴스분석/리포트)가 두 정보를 모두 쓸 수 있게 한다.
+        result = {**c, **result}
 
         if result["value_maintained"]:
             print(f"  [통과] {c['name']}({c['code']}) - {result['reason']}")
