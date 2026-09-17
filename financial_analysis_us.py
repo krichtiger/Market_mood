@@ -73,9 +73,7 @@ def run_financial_analysis(candidates):
     """
     passed = []
     for c in candidates:
-        result = analyze_financial_value(c["code"])
-        result["name"] = c["name"]
-        result["market"] = c["market"]
+        result = {**c, **analyze_financial_value(c["code"])}
 
         if result["value_maintained"]:
             print(f"  [통과] {c['name']}({c['code']}) - {result['reason']}")

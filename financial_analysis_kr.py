@@ -204,9 +204,7 @@ def run_financial_analysis(candidates):
             print(f"[SKIP] {c['name']}({c['code']}) DART corp_code 매핑 없음")
             continue
 
-        result = analyze_financial_value(c["code"], corp_code)
-        result["name"] = c["name"]
-        result["market"] = c["market"]
+        result = {**c, **analyze_financial_value(c["code"], corp_code)}
 
         if result["value_maintained"]:
             print(f"  [통과] {c['name']}({c['code']}) - {result['reason']}")
